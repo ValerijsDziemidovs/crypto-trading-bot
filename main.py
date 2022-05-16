@@ -1,5 +1,6 @@
 import tkinter as tk
 import logging
+from connectors.binance_futures import BinanceFuturesClient
 
 
 logger = logging.getLogger()
@@ -19,5 +20,12 @@ logger.addHandler(stream_handler)
 logger.addHandler(file_handler)
 
 if __name__=='__main__':
-    root = tk.Tk()
-    root.mainloop()
+    binance = BinanceFuturesClient(True)
+
+    print(binance.get_contracts())
+    print(binance.get_bid_ask('BTCUSDT'))
+    print(binance.get_historical_candles('BTCUSDT', '1h'))
+
+    #root = tk.Tk()
+    #root.mainloop()
+    
