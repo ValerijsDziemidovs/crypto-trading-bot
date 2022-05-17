@@ -6,6 +6,11 @@ class Settings(BaseSettings):
     #Binance
     BINANCE_PUBLIC_KEY: str
     BINANCE_SECRET_KEY: str
+    
+    BINANCE_MAIN_URL: str
+    BINANCE_TEST_URL: str
+    BINANCE_MAIN_WSS: str
+    BINANCE_TEST_WSS: str
 
 
     class Config:

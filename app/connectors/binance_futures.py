@@ -4,15 +4,20 @@ import time
 import hmac
 import hashlib
 from urllib.parse import urlencode
+from app.config import config
+import websocket
+import threading
 
 logger = logging.getLogger()
 
 class BinanceFuturesClient:
     def __init__(self, public_key, secret_key, testnet):
         if testnet:
-            self.base_url = 'https://testnet.binancefuture.com'
+            self.base_url = config. BINANCE_TEST_URL
+            self.wss_url = config.BINANCE_TEST_WSS
         else:
-            self.base_url = 'https://fapi.binance.com'
+            self.base_url = config.BINANCE_MAIN_URL
+            self.wss_url = config.BINANCE_MAIN_WSS
 
         self.public_key = public_key
         self.secret_key = secret_key
@@ -23,12 +28,20 @@ class BinanceFuturesClient:
 
         logger.info('Binance Futures Client successfully initialized')
 
+        t = threading.Thread(target=self.start_ws())
+        t.start()
+
+
     def generate_signature(self, data):
             return hmac.new(self.secret_key.encode(), urlencode(data).encode(), hashlib.sha256).hexdigest()
 
     def make_request(self, method, endpoint, data): #Method makes request to the endpoint
         if method == "GET":
             response = requests.get(self.base_url + endpoint, params=data, headers=self.headers)
+        elif method == 'POST':
+            response = requests.post(self.base_url + endpoint, params=data, headers=self.headers)
+        elif method == 'DELETE':
+            response = requests.delete(self.base_url + endpoint, params=data, headers=self.headers)
         else:
             raise ValueError()
 
@@ -93,11 +106,37 @@ class BinanceFuturesClient:
 
         return balances
 
-    def place_order(self):
-        return
+    def place_order(self, symbol, side, quantity, order_type, price=None, tif=None): #tif=time in force
+        data = dict()
+        data['symbol'] = symbol
+        data['side'] = side
+        data['quantity'] = quantity
+        data['type'] = order_type
 
-    def cancel_order(self):
-        return
+        if price is not None:
+            data['price'] = price
+        
+        if tif is not None:
+            data['timeInForce'] = tif
+
+        data['timestamp'] = int(time.time() * 1000)
+        data['signature'] = self.generate_signature(data)
+
+        order_status = self.make_request('POST', '/fapi/v1/order', data)
+
+        return order_status
+
+    def cancel_order(self, symbol, order_id):
+        data = dict()
+        data['orderId'] = order_id
+        data['symbol'] = symbol
+
+        data['timestamp'] = int(time.time() * 1000)
+        data['signature'] = self.generate_signature(data)
+
+        order_status = self.make_request('DELETE', '/fapi/v1/order', data)
+
+        return order_status
 
     def get_order_status(self, symbol, order_id):
         data = dict()
@@ -110,4 +149,26 @@ class BinanceFuturesClient:
         order_status = self.make_request('GET', '/fapi/v1/order', data)
 
         return order_status
+
+    def start_ws(self):
+        ws = websocket.WebSocketApp(
+        self.wss_url, 
+        on_open=self.on_open, 
+        on_close=self.on_close, 
+        on_error=self.on_error, 
+        on_message=self.on_message
+    )
+        ws.run_forever()
+
+    def on_open(self, ws):
+        logger.info('Binance Websocket connection opened')
+
+    def on_close(self, ws):
+        logger.warning('Binance Websocket connection closed')
+
+    def on_error(self, ws, msg):
+        logger.error('Binance Websocket connection error: %s', msg)
+
+    def on_message(self, ws, msg):
+        print(msg)
 
