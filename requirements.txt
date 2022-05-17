@@ -3,3 +3,4 @@ requests
 hmac
 hashlib
 python-dotenv
+websocket-client==0.58.0
